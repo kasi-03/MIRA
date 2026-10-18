@@ -1,5 +1,5 @@
 Write-Host "Running MIRA Automated Test Suite..." -ForegroundColor Cyan
-python -m pytest tests -v
+python -m pytest -p no:anyio tests -v
 if ($LASTEXITCODE -eq 0) {
     Write-Host "All tests passed successfully!" -ForegroundColor Green
 } else {
