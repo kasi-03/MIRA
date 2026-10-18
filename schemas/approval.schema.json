@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mira.local/schemas/approval.schema.json",
+  "title": "MIRAApproval",
+  "description": "Defines the authorization contract for consequential, state-mutating, or high-risk tool operations on the Windows workstation.",
+  "type": "object",
+  "required": [
+    "approval_id",
+    "task_id",
+    "user_id",
+    "requested_by_device_id",
+    "target_tool",
+    "action_summary",
+    "risk_level",
+    "status",
+    "expires_at",
+    "created_at"
+  ],
+  "properties": {
+    "approval_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Unique UUIDv4 identifier for the approval request."
+    },
+    "task_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUIDv4 of the associated parent task awaiting clearance."
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Unique UUIDv4 identifying the human user to whom the approval request is issued, distinct from device identity."
+    },
+    "requested_by_device_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUIDv4 of the device that triggered or requested the task (Phone 1)."
+    },
+    "target_tool": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]{3,64}$",
+      "description": "The exact FastMCP tool pending execution (e.g., 'run_sandboxed_script', 'mutate_workspace_file')."
+    },
+    "action_summary": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 300,
+      "description": "Clear explanation of what the consequential tool will do on the laptop."
+    },
+    "parameters": {
+      "type": "object",
+      "description": "Inspected arguments and payload passed to the tool, surfaced for audit and user consent."
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"],
+      "description": "Assessed operational hazard rating of the action."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "approved",
+        "rejected",
+        "expired",
+        "revoked"
+      ],
+      "description": "Current status of the approval request."
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Strict expiration time (TTL max 300 seconds). Once expired, tool execution is blocked."
+    },
+    "decision_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp when the user approved or rejected the action."
+    },
+    "decision_by_user_id": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "description": "UUIDv4 of the human user who authorized or rejected the decision, distinct from device identity."
+    },
+    "decision_by_device_id": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "description": "UUIDv4 of the authorizing device (Phone 1)."
+    },
+    "decision_reason": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "description": "Optional user notes or system justification for rejection or revocation."
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the approval ticket was issued."
+    }
+  },
+  "additionalProperties": false
+}

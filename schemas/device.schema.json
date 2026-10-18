@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mira.local/schemas/device.schema.json",
+  "title": "MIRADevice",
+  "description": "Defines device identity, cryptographic registration, user association, and operational state for authenticated endpoints in the MIRA ecosystem.",
+  "type": "object",
+  "required": [
+    "device_id",
+    "user_id",
+    "device_name",
+    "device_type",
+    "platform",
+    "status",
+    "capabilities",
+    "registered_at",
+    "updated_at"
+  ],
+  "properties": {
+    "device_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Unique UUIDv4 identifying the physical device or server instance."
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      "description": "Unique UUIDv4 identifying the human user owning or operating this device, distinct from device identity."
+    },
+    "device_name": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 80,
+      "description": "User-friendly label (e.g., 'Pixel 9 Pro - Phone 1 Primary', 'Alienware Laptop - Windows MCP Server')."
+    },
+    "device_type": {
+      "type": "string",
+      "enum": [
+        "phone_primary",
+        "windows_workstation",
+        "cloud_backend"
+      ],
+      "description": "Architectural classification. Phone 1 is classified strictly as 'phone_primary'."
+    },
+    "platform": {
+      "type": "string",
+      "enum": [
+        "android",
+        "ios",
+        "windows_11",
+        "linux_container"
+      ],
+      "description": "Operating system environment hosting the client or server runtime."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "online",
+        "offline",
+        "paired",
+        "unpaired",
+        "suspended"
+      ],
+      "description": "Current network session and pairing state."
+    },
+    "auth_token_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "SHA-256 hash of the device bearer secret/mTLS public certificate fingerprint."
+    },
+    "capabilities": {
+      "type": "array",
+      "description": "Set of authorized role tokens granted to this device.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "task:submit",
+          "task:read",
+          "approval:grant",
+          "artifact:read",
+          "mcp:execute_tool",
+          "mcp:host_server",
+          "admin:manage_devices"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "ip_address": {
+      "type": ["string", "null"],
+      "format": "ipv4",
+      "description": "Last observed local or routable IP address for diagnostic telemetry."
+    },
+    "last_heartbeat_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "Timestamp of the most recent keep-alive heartbeat message."
+    },
+    "registered_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when device trust pairing was established."
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of last modification or status transition."
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Device hardware attributes (e.g., screen dimensions, browser version, client OS build)."
+    }
+  },
+  "additionalProperties": false
+}
