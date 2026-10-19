@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useSpeechInput } from '../../hooks/useSpeechInput';
 import { 
   Home, 
   Layers, 
@@ -47,7 +48,19 @@ export const Phone1MobileView = () => {
   const [mobileTab, setMobileTab] = useState('home'); // 'home', 'tasks', 'output', 'devices', 'notifications'
   const [mobileFilter, setMobileFilter] = useState('all');
   const [mobileInput, setMobileInput] = useState('');
-  const [isVoiceListening, setIsVoiceListening] = useState(false);
+
+  const {
+    isListening: isVoiceListening,
+    isSupported: isSpeechSupported,
+    toggleListening: toggleVoiceListening
+  } = useSpeechInput({
+    onTranscript: (liveText) => {
+      setMobileInput(liveText);
+    },
+    onError: (errMsg) => {
+      if (showToast) showToast(errMsg);
+    }
+  });
 
   const activeTasks = tasks.filter(t => ['waiting', 'processing', 'pending_confirmation', 'confirmed', 'validating', 'awaiting_approval', 'executing', 'verifying'].includes(t.status));
   const awaitingApproval = tasks.filter(t => t.status === 'awaiting_approval');
@@ -67,13 +80,17 @@ export const Phone1MobileView = () => {
   };
 
   const handleVoiceTap = () => {
-    setIsVoiceListening(true);
-    showToast("Listening for speech on mobile...");
-    setTimeout(() => {
-      setIsVoiceListening(false);
+    if (!isSpeechSupported) {
+      if (showToast) showToast("Web Speech API not supported in this browser. Inserted voice sample.");
       setMobileInput("Generate an event poster for AI Summit 2026 with emerald and champagne gold accents.");
-      showToast("Voice prompt captured!");
-    }, 2000);
+      return;
+    }
+    const started = toggleVoiceListening((liveText) => {
+      setMobileInput(liveText);
+    });
+    if (started && showToast) {
+      showToast("Listening... Speak into mobile microphone.");
+    }
   };
 
   return (
@@ -216,13 +233,14 @@ export const Phone1MobileView = () => {
                       color: isVoiceListening ? '#FFFFFF' : 'var(--color-gold-hover)',
                       cursor: 'pointer'
                     }}
+                    title={isVoiceListening ? "Click to stop listening" : "Click to speak via mobile microphone"}
                   >
                     <Mic size={14} />
                   </button>
 
                   <input
                     type="text"
-                    placeholder={isVoiceListening ? "Listening on mobile..." : "Ask MIRA or request task..."}
+                    placeholder={isVoiceListening ? "Listening to mobile microphone... Speak now..." : "Ask MIRA or request task..."}
                     value={mobileInput}
                     onChange={e => setMobileInput(e.target.value)}
                     style={{ flex: 1, border: 'none', backgroundColor: 'transparent', fontSize: '13px', color: 'var(--color-espresso)' }}

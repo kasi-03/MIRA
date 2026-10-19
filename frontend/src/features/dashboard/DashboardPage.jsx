@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useSpeechInput } from '../../hooks/useSpeechInput';
 import { 
   Sparkles, 
   Send, 
@@ -38,7 +39,19 @@ export const DashboardPage = () => {
   } = useApp();
 
   const [quickInput, setQuickInput] = useState('');
-  const [isVoiceActive, setIsVoiceActive] = useState(false);
+
+  const {
+    isListening: isVoiceActive,
+    isSupported: isSpeechSupported,
+    toggleListening: toggleVoiceListening
+  } = useSpeechInput({
+    onTranscript: (liveText) => {
+      setQuickInput(liveText);
+    },
+    onError: (errMsg) => {
+      if (showToast) showToast(errMsg);
+    }
+  });
 
   const activeTasks = tasks.filter(t => ['waiting', 'processing', 'pending_confirmation', 'confirmed', 'validating', 'awaiting_approval', 'executing', 'verifying'].includes(t.status));
   const completedTasks = tasks.filter(t => t.status === 'completed');
@@ -69,14 +82,18 @@ export const DashboardPage = () => {
     });
   };
 
-  const handleSimulateVoice = () => {
-    setIsVoiceActive(true);
-    showToast("Alexa listening for voice prompt on Phone 2...");
-    setTimeout(() => {
-      setIsVoiceActive(false);
+  const handleVoiceClick = () => {
+    if (!isSpeechSupported) {
+      if (showToast) showToast("Web Speech API not supported in this browser. Inserted voice sample.");
       setQuickInput("Generate an event poster for AI Summit 2026 with emerald and champagne gold accents.");
-      showToast("Voice prompt captured: AI Summit 2026 Poster");
-    }, 2200);
+      return;
+    }
+    const started = toggleVoiceListening((liveText) => {
+      setQuickInput(liveText);
+    });
+    if (started && showToast) {
+      showToast("Listening... Speak into your microphone.");
+    }
   };
 
   return (
@@ -132,7 +149,7 @@ export const DashboardPage = () => {
           }}>
             <button
               type="button"
-              onClick={handleSimulateVoice}
+              onClick={handleVoiceClick}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -145,14 +162,14 @@ export const DashboardPage = () => {
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
-              title="Speak via Phone 2 Alexa"
+              title={isVoiceActive ? "Click to stop listening" : "Speak via Phone 2 Alexa microphone"}
             >
               <Mic size={16} />
             </button>
 
             <input
               type="text"
-              placeholder={isVoiceActive ? "Listening on Phone 2 Alexa Companion..." : "Speak or type: 'Alexa, tell MIRA to generate an event poster for AI Summit 2026'..."}
+              placeholder={isVoiceActive ? "Listening to your microphone... Speak now..." : "Speak or type: 'Alexa, tell MIRA to generate an event poster for AI Summit 2026'..."}
               value={quickInput}
               onChange={e => setQuickInput(e.target.value)}
               style={{
