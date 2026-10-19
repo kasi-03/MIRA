@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
+import { useSpeechInput } from '../../hooks/useSpeechInput';
 import { Mic, Send, Sparkles, X, ShieldAlert, Cpu, CheckCircle } from 'lucide-react';
 
 const PRESET_PROMPTS = [
@@ -30,34 +31,46 @@ const PRESET_PROMPTS = [
 ];
 
 export const TaskComposerModal = () => {
-  const { isComposerOpen, setIsComposerOpen, submitNewTask } = useApp();
+  const { isComposerOpen, setIsComposerOpen, submitNewTask, showToast } = useApp();
   const [prompt, setPrompt] = useState('');
   const [title, setTitle] = useState('');
   const [riskLevel, setRiskLevel] = useState('low');
   const [selectedTool, setSelectedTool] = useState('generate_svg_poster');
-  const [isListening, setIsListening] = useState(false);
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
 
-  // Simulated voice listening timer
-  useEffect(() => {
-    let interval = null;
-    if (isListening) {
-      interval = setInterval(() => {
-        setRecordingSeconds(sec => {
-          if (sec >= 4) {
-            setIsListening(false);
-            setPrompt("Generate an event poster for AI Summit 2026 with emerald and champagne gold accents.");
-            setTitle("Generate event poster for AI Summit 2026");
-            return 0;
-          }
-          return sec + 1;
-        });
-      }, 1000);
-    } else {
-      setRecordingSeconds(0);
+  const {
+    isListening,
+    transcript,
+    isSupported: isSpeechSupported,
+    toggleListening
+  } = useSpeechInput({
+    onTranscript: (liveText) => {
+      setPrompt(liveText);
+      if (!title) {
+        setTitle(liveText.slice(0, 40));
+      }
+    },
+    onError: (errMsg) => {
+      if (showToast) showToast(errMsg);
     }
-    return () => clearInterval(interval);
-  }, [isListening]);
+  });
+
+  const handleMicClick = () => {
+    if (!isSpeechSupported) {
+      if (showToast) showToast("Web Speech API not supported in this browser. Inserted voice sample.");
+      setPrompt("Generate an event poster for AI Summit 2026 with emerald and champagne gold accents.");
+      setTitle("AI Summit 2026 Event Poster");
+      return;
+    }
+    const started = toggleListening((liveText) => {
+      setPrompt(liveText);
+      if (!title) {
+        setTitle(liveText.slice(0, 40));
+      }
+    });
+    if (started && showToast) {
+      showToast("Listening... Speak your task request into your microphone.");
+    }
+  };
 
   if (!isComposerOpen) return null;
 
@@ -139,20 +152,21 @@ export const TaskComposerModal = () => {
               </div>
             </div>
 
-            {/* Voice Input Simulator Banner */}
+            {/* Voice Input Microphone Banner */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               padding: '14px 18px',
               backgroundColor: isListening ? 'var(--color-gold-light)' : 'var(--color-surface)',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-sm)'
+              border: isListening ? '1.5px solid var(--color-gold)' : '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-sm)',
+              transition: 'all 0.2s ease'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <button
                   type="button"
-                  onClick={() => setIsListening(!isListening)}
+                  onClick={handleMicClick}
                   style={{
                     width: '42px',
                     height: '42px',
@@ -163,17 +177,21 @@ export const TaskComposerModal = () => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     transition: 'all 0.2s ease',
-                    boxShadow: isListening ? '0 0 0 6px rgba(176, 138, 80, 0.25)' : 'none'
+                    boxShadow: isListening ? '0 0 0 6px rgba(176, 138, 80, 0.25)' : 'none',
+                    cursor: 'pointer'
                   }}
+                  title={isListening ? "Click to stop microphone" : "Click to speak via microphone"}
                 >
                   <Mic size={20} />
                 </button>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--color-espresso)' }}>
-                    {isListening ? `Listening to Alexa voice stream... (${4 - recordingSeconds}s)` : "Phone 2 Alexa Speech Engine"}
+                    {isListening ? "Listening to Microphone... (Speak Now)" : "Phone 2 Alexa Speech Engine"}
                   </div>
                   <div style={{ fontSize: '11.5px', color: 'var(--color-espresso-muted)' }}>
-                    {isListening ? "Simulating audio capture via Web Speech API" : "Tap microphone to speak or simulate voice command"}
+                    {isListening 
+                      ? (transcript ? `Transcribed: "${transcript}"` : "Audio stream active: speak your prompt clearly...") 
+                      : (isSpeechSupported ? "Tap microphone to speak your task request directly" : "Microphone unsupported in browser: tap for sample")}
                   </div>
                 </div>
               </div>
