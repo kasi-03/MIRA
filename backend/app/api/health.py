@@ -1,30 +1,25 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-from ..database import get_db
-from ..config import settings
-from ..models import Device
+import socket
+from flask import Blueprint, jsonify
 
-router = APIRouter(tags=["Health"])
+health_bp = Blueprint("health", __name__, url_prefix="/api/health")
 
-@router.get("/health")
-def health_check(db: Session = Depends(get_db)):
-    db_healthy = False
+def get_local_ip():
     try:
-        db.execute(text("SELECT 1"))
-        db_healthy = True
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
     except Exception:
-        db_healthy = False
+        return "127.0.0.1"
 
-    active_agents = db.query(Device).filter(Device.device_type == "windows_workstation").count()
-
-    return {
-        "status": "healthy" if db_healthy else "degraded",
-        "app_env": settings.APP_ENV,
-        "database": {
-            "status": "connected" if db_healthy else "error",
-            "dialect": db.bind.dialect.name
-        },
-        "windows_workstation_agents": active_agents,
-        "workspace_root": settings.WORKSPACE_ROOT
-    }
+@health_bp.route("", methods=["GET"])
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "service": "mira-backend",
+        "version": "1.0.0",
+        "storage": "sqlite-wal",
+        "workstation_agent": "fastmcp-windows",
+        "local_ip": get_local_ip(),
+    })

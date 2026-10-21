@@ -1,134 +1,124 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 
 /**
- * useSpeechInput hook provides real Web Speech API microphone integration
- * with live streaming transcription and graceful error handling.
+ * useSpeechInput
+ * State-driven voice interaction hook with Web Speech API integration,
+ * permission handling, error states, and text fallback.
  */
 export function useSpeechInput({ onTranscript, onError } = {}) {
-  const [isListening, setIsListening] = useState(false);
+  const [voiceState, setVoiceState] = useState('ready'); // 'ready' | 'requesting_permission' | 'listening' | 'transcribing' | 'reviewing' | 'error'
   const [transcript, setTranscript] = useState('');
-  const [error, setError] = useState(null);
-  const [permissionState, setPermissionState] = useState('prompt'); // 'prompt', 'granted', 'denied'
+  const [isSupported, setIsSupported] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
+
   const recognitionRef = useRef(null);
 
-  const isSupported = typeof window !== 'undefined' && 
-    Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
-
-  // Clean up recognition instance on component unmount
   useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      setIsSupported(true);
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
+
+        recognition.onstart = () => {
+          setVoiceState('listening');
+          setErrorMessage(null);
+        };
+
+        recognition.onresult = (event) => {
+          setVoiceState('transcribing');
+          let currentTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            currentTranscript += event.results[i][0].transcript;
+          }
+          setTranscript(currentTranscript);
+          if (onTranscript) {
+            onTranscript(currentTranscript);
+          }
+        };
+
+        recognition.onerror = (event) => {
+          setVoiceState('error');
+          let errText = 'Speech recognition error';
+          if (event.error === 'not-allowed') {
+            errText = 'Microphone permission denied. You can continue by typing your request.';
+          } else if (event.error === 'no-speech') {
+            errText = 'No speech detected. Please try speaking again or type your prompt.';
+          } else if (event.error === 'network') {
+            errText = 'Network connection required for voice transcription.';
+          }
+          setErrorMessage(errText);
+          if (onError) onError(errText);
+        };
+
+        recognition.onend = () => {
+          setVoiceState('ready');
+        };
+
+        recognitionRef.current = recognition;
+      } catch (e) {
+        setIsSupported(false);
+        setErrorMessage('Speech recognition initialization failed on this device.');
+      }
+    } else {
+      setIsSupported(false);
+    }
+
     return () => {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
-        } catch (_) {}
+        } catch (e) {}
       }
     };
-  }, []);
+  }, [onTranscript, onError]);
+
+  const startListening = useCallback(() => {
+    setErrorMessage(null);
+    if (!isSupported) {
+      setVoiceState('error');
+      setErrorMessage('Voice input is not supported in this browser. Please use text input.');
+      return;
+    }
+
+    if (recognitionRef.current) {
+      try {
+        setVoiceState('requesting_permission');
+        recognitionRef.current.start();
+      } catch (e) {
+        // Recognition already started or error
+        try {
+          recognitionRef.current.stop();
+        } catch (stopErr) {}
+      }
+    }
+  }, [isSupported]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-      } catch (_) {}
+      } catch (e) {}
     }
-    setIsListening(false);
+    setVoiceState('ready');
   }, []);
 
-  const startListening = useCallback((customOnTranscript) => {
-    setError(null);
+  const resetVoiceState = useCallback(() => {
+    setVoiceState('ready');
     setTranscript('');
-
-    if (!isSupported) {
-      const msg = 'Web Speech API is not supported in this browser. Please use Google Chrome, Microsoft Edge, or Safari.';
-      setError(msg);
-      if (onError) onError(msg);
-      return false;
-    }
-
-    try {
-      // Abort any existing instance
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch (_) {}
-      }
-
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognitionRef.current = recognition;
-
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = navigator.language || 'en-US';
-
-      recognition.onstart = () => {
-        setIsListening(true);
-        setPermissionState('granted');
-      };
-
-      recognition.onresult = (event) => {
-        let liveTranscript = '';
-        for (let i = 0; i < event.results.length; i++) {
-          liveTranscript += event.results[i][0].transcript;
-        }
-        setTranscript(liveTranscript);
-        if (customOnTranscript) {
-          customOnTranscript(liveTranscript);
-        } else if (onTranscript) {
-          onTranscript(liveTranscript);
-        }
-      };
-
-      recognition.onerror = (event) => {
-        let msg = `Microphone error: ${event.error}`;
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          msg = 'Microphone permission denied. Please allow microphone access in your browser address bar.';
-          setPermissionState('denied');
-        } else if (event.error === 'no-speech') {
-          msg = 'No speech was detected. Please check your microphone input volume and try again.';
-        } else if (event.error === 'audio-capture') {
-          msg = 'No microphone device was detected on your computer.';
-        } else if (event.error === 'network') {
-          msg = 'Network communication issue with speech recognition service.';
-        }
-        setError(msg);
-        setIsListening(false);
-        if (onError) onError(msg);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognition.start();
-      return true;
-    } catch (err) {
-      const msg = err.message || 'Could not start microphone.';
-      setError(msg);
-      setIsListening(false);
-      if (onError) onError(msg);
-      return false;
-    }
-  }, [isSupported, onTranscript, onError]);
-
-  const toggleListening = useCallback((customOnTranscript) => {
-    if (isListening) {
-      stopListening();
-    } else {
-      return startListening(customOnTranscript);
-    }
-  }, [isListening, startListening, stopListening]);
+    setErrorMessage(null);
+  }, []);
 
   return {
-    isListening,
+    voiceState,
     transcript,
-    error,
     isSupported,
-    permissionState,
+    errorMessage,
     startListening,
     stopListening,
-    toggleListening
+    resetVoiceState,
   };
 }
-
-export default useSpeechInput;
